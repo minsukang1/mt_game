@@ -142,29 +142,37 @@ class _QuizGameScreenState extends State<QuizGameScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                if (phase != Phase.setup)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Wrap(
-                      spacing: 8,
-                      children: [
-                        for (var i = 0; i < teams.length; i++)
-                          Chip(
-                            label: Text('${teams[i].name} ${scores[i]}'),
-                            backgroundColor:
-                                phase != Phase.finished && i == teamIdx
-                                    ? Theme.of(context)
-                                        .colorScheme
-                                        .primaryContainer
-                                    : null,
-                          ),
-                      ],
+                // 모든 팀의 게임이 끝났을 때만 점수 공개
+                if (phase == Phase.finished)
+                Padding(
+                    padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                     ),
-                  ),
+                    child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                        for (var i = 0; i < teams.length; i++)
+                        Chip(
+                            label: Text(
+                            '${teams[i].name} ${scores[i]}점',
+                            ),
+                        ),
+                    ],
+                    ),
+                ),
                 Expanded(child: _body(teams)),
                 Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: SizedBox(width: double.infinity, child: _bottom()),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                    ),
+                    child: SizedBox(
+                        width: double.infinity,
+                        child: _bottom(),
+                    ),
                 ),
               ],
             ),
@@ -264,46 +272,112 @@ class _QuizGameScreenState extends State<QuizGameScreen> {
     );
   }
 
-  Widget _questionView(List teams) {
-    final q = assigned[teamIdx][qIdx];
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '${teams[teamIdx].name} · 문제 ${qIdx + 1}/${assigned[teamIdx].length} · ${q.category}',
-            style: theme.textTheme.titleMedium,
+Widget _questionView(List teams) {
+  final q = assigned[teamIdx][qIdx];
+  final theme = Theme.of(context);
+
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      // 현재 문제 영역의 실제 너비와 높이
+      final width = constraints.maxWidth;
+      final height = constraints.maxHeight;
+
+      // 화면이 작으면 글자도 작아지고,
+      // 화면이 크면 글자도 커지도록 설정
+      final questionFontSize =
+          (height * 0.10).clamp(18.0, 40.0);
+      final timerFontSize =
+          (height * 0.16).clamp(30.0, 60.0);
+      final answerFontSize =
+          (height * 0.075).clamp(18.0, 32.0);
+
+      return SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 4,
           ),
-          const SizedBox(height: 16),
-          Text(
-            '$remaining',
-            style: theme.textTheme.displayLarge?.copyWith(
-              color: remaining <= 5 ? Colors.red : null,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: height > 0 ? height - 8 : 0,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 현재 팀과 문제 번호
+                Text(
+                  '${teams[teamIdx].name} · '
+                  '문제 ${qIdx + 1}/${assigned[teamIdx].length} · '
+                  '${q.category}',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: width < 400 ? 14 : 18,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                // 남은 시간
+                Text(
+                  '$remaining',
+                  style: theme.textTheme.displayLarge?.copyWith(
+                    fontSize: timerFontSize,
+                    color: remaining <= 5
+                        ? Colors.red
+                        : null,
+                  ),
+                ),
+
+                if (remaining == 0)
+                  Text(
+                    '시간 종료!',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: Colors.red,
+                    ),
+                  ),
+
+                const SizedBox(height: 8),
+
+                // 문제 본문
+                SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    q.question,
+                    textAlign: TextAlign.center,
+                    softWrap: true,
+                    style: theme.textTheme.headlineLarge?.copyWith(
+                      fontSize: questionFontSize,
+                      fontWeight: FontWeight.bold,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+
+                // 정답 보기 버튼을 누른 뒤에만 정답 표시
+                if (revealed) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    q.answer,
+                    textAlign: TextAlign.center,
+                    softWrap: true,
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      fontSize: answerFontSize,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          if (remaining == 0)
-            Text('시간 종료!',
-                style: theme.textTheme.titleLarge?.copyWith(color: Colors.red)),
-          const SizedBox(height: 16),
-          Text(q.question,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineLarge),
-          const SizedBox(height: 24),
-          if (revealed)
-            Text(
-              q.answer,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.displaySmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   Widget _bottom() {
     switch (phase) {

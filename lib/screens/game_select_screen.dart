@@ -1,11 +1,19 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../data/session_state.dart';
 import 'games/placeholder_game_screen.dart';
-import 'total_score_screen.dart';
 import 'games/quiz_game_screen.dart';
+import 'games/line_game_screen.dart';
+import 'total_score_screen.dart';
 
-const gameNames = ['상식퀴즈', '줄줄이 말해요', '고요 속의 외침', '인물 퀴즈'];
+const gameNames = [
+  '상식퀴즈',
+  '줄줄이 말해요',
+  '고요 속의 외침',
+  '인물 퀴즈',
+];
 
 class GameSelectScreen extends StatelessWidget {
   const GameSelectScreen({super.key});
@@ -16,16 +24,23 @@ class GameSelectScreen extends StatelessWidget {
     final totals = session.totals;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('게임 선택')),
+      appBar: AppBar(
+        title: const Text('게임 선택'),
+      ),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
             child: Wrap(
               spacing: 12,
+              runSpacing: 8,
               children: [
                 for (var i = 0; i < session.teams.length; i++)
-                  Chip(label: Text('${session.teams[i].name} ${totals[i]}점')),
+                  Chip(
+                    label: Text(
+                      '${session.teams[i].name} ${totals[i]}점',
+                    ),
+                  ),
               ],
             ),
           ),
@@ -37,14 +52,26 @@ class GameSelectScreen extends StatelessWidget {
                   ListTile(
                     title: Text(name),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => name == '상식퀴즈'
-                            ? const QuizGameScreen()
-                            : PlaceholderGameScreen(gameName: name),
-                      ),
-                    ),
+                    onTap: () {
+                      final Widget screen;
+
+                      if (name == '상식퀴즈') {
+                        screen = const QuizGameScreen();
+                      } else if (name == '줄줄이 말해요') {
+                        screen = const LineGameScreen();
+                      } else {
+                        screen = PlaceholderGameScreen(
+                          gameName: name,
+                        );
+                      }
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => screen,
+                        ),
+                      );
+                    },
                   ),
               ],
             ),
@@ -54,10 +81,14 @@ class GameSelectScreen extends StatelessWidget {
             child: SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const TotalScoreScreen()),
-                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const TotalScoreScreen(),
+                    ),
+                  );
+                },
                 child: const Text('게임 종료 · 총점 보기'),
               ),
             ),
