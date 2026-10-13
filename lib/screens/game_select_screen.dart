@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../data/session_state.dart';
 import 'games/placeholder_game_screen.dart';
 import 'total_score_screen.dart';
+import 'games/quiz_game_screen.dart';
 
 const gameNames = ['상식퀴즈', '줄줄이 말해요', '고요 속의 외침', '인물 퀴즈'];
 
@@ -39,7 +40,9 @@ class GameSelectScreen extends StatelessWidget {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => PlaceholderGameScreen(gameName: name),
+                        builder: (_) => name == '상식퀴즈'
+                            ? const QuizGameScreen()
+                            : PlaceholderGameScreen(gameName: name),
                       ),
                     ),
                   ),
