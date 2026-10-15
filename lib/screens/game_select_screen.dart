@@ -7,6 +7,7 @@ import 'games/placeholder_game_screen.dart';
 import 'games/quiz_game_screen.dart';
 import 'games/line_game_screen.dart';
 import 'total_score_screen.dart';
+import 'games/character_quiz_screen.dart';
 
 const gameNames = [
   '상식퀴즈',
@@ -59,6 +60,8 @@ class GameSelectScreen extends StatelessWidget {
                         screen = const QuizGameScreen();
                       } else if (name == '줄줄이 말해요') {
                         screen = const LineGameScreen();
+                      } else if (name == '인물 퀴즈') {
+                        screen = const CharacterQuizScreen();
                       } else {
                         screen = PlaceholderGameScreen(
                           gameName: name,

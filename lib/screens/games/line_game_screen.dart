@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import '../../data/session_state.dart';
 import '../../models/game_result.dart';
 import '../../models/team.dart';
+import 'dart:convert';
+import 'package:flutter/services.dart';
 
 const int lineGameSeconds = 30;
 
@@ -20,78 +22,10 @@ class LineQuestion {
   });
 }
 
-const Map<String, List<LineQuestion>> lineQuestions = {
-  '사자성어': [
-    LineQuestion(prompt: '고진', answer: '감래'),
-    LineQuestion(prompt: '새옹', answer: '지마'),
-    LineQuestion(prompt: '일석', answer: '이조'),
-    LineQuestion(prompt: '동문', answer: '서답'),
-    LineQuestion(prompt: '우왕', answer: '좌왕'),
-    LineQuestion(prompt: '작심', answer: '삼일'),
-    LineQuestion(prompt: '전화', answer: '위복'),
-    LineQuestion(prompt: '과유', answer: '불급'),
-    LineQuestion(prompt: '자업', answer: '자득'),
-    LineQuestion(prompt: '금상', answer: '첨화'),
-    LineQuestion(prompt: '설상', answer: '가상'),
-    LineQuestion(prompt: '역지', answer: '사지'),
-    LineQuestion(prompt: '이심', answer: '전심'),
-    LineQuestion(prompt: '청출', answer: '어람'),
-    LineQuestion(prompt: '대기', answer: '만성'),
-    LineQuestion(prompt: '다다', answer: '익선'),
-    LineQuestion(prompt: '유비', answer: '무환'),
-    LineQuestion(prompt: '오리', answer: '무중'),
-    LineQuestion(prompt: '백전', answer: '백승'),
-    LineQuestion(prompt: '천생', answer: '연분'),
-  ],
-  '일상 단어': [
-    LineQuestion(prompt: '휴대', answer: '전화'),
-    LineQuestion(prompt: '대한', answer: '민국'),
-    LineQuestion(prompt: '비밀', answer: '번호'),
-    LineQuestion(prompt: '손목', answer: '시계'),
-    LineQuestion(prompt: '교통', answer: '카드'),
-    LineQuestion(prompt: '고속', answer: '도로'),
-    LineQuestion(prompt: '김치', answer: '찌개'),
-    LineQuestion(prompt: '감자', answer: '튀김'),
-    LineQuestion(prompt: '생일', answer: '파티'),
-    LineQuestion(prompt: '택배', answer: '상자'),
-    LineQuestion(prompt: '종이', answer: '비행기'),
-    LineQuestion(prompt: '세면', answer: '도구'),
-    LineQuestion(prompt: '음식물', answer: '쓰레기'),
-    LineQuestion(prompt: '전자', answer: '레인지'),
-    LineQuestion(prompt: '운동화', answer: '끈'),
-    LineQuestion(prompt: '자외선', answer: '차단제'),
-    LineQuestion(prompt: '주민', answer: '등록증'),
-    LineQuestion(prompt: '학교', answer: '생활'),
-    LineQuestion(prompt: '출발', answer: '신호'),
-    LineQuestion(prompt: '냉동', answer: '만두'),
-    LineQuestion(prompt: '아이스', answer: '크림'),
-    LineQuestion(prompt: '아파트', answer: '단지'),
-    LineQuestion(prompt: '자동차', answer: '보험'),
-    LineQuestion(prompt: '휴대폰', answer: '충전기'),
-  ],
-  '속담': [
-    LineQuestion(prompt: '가는 말이', answer: '고와야 오는 말이 곱다'),
-    LineQuestion(prompt: '백지장도', answer: '맞들면 낫다'),
-    LineQuestion(prompt: '티끌 모아', answer: '태산'),
-    LineQuestion(prompt: '원숭이도', answer: '나무에서 떨어진다'),
-    LineQuestion(prompt: '낮말은 새가 듣고', answer: '밤말은 쥐가 듣는다'),
-    LineQuestion(prompt: '소 잃고', answer: '외양간 고친다'),
-    LineQuestion(prompt: '등잔 밑이', answer: '어둡다'),
-    LineQuestion(prompt: '금강산도', answer: '식후경'),
-    LineQuestion(prompt: '꿩 먹고', answer: '알 먹기'),
-    LineQuestion(prompt: '세 살 버릇', answer: '여든까지 간다'),
-    LineQuestion(prompt: '호랑이도 제 말 하면', answer: '온다'),
-    LineQuestion(prompt: '하늘의 별', answer: '따기'),
-    LineQuestion(prompt: '돌다리도', answer: '두들겨 보고 건너라'),
-    LineQuestion(prompt: '고래 싸움에', answer: '새우 등 터진다'),
-    LineQuestion(prompt: '믿는 도끼에', answer: '발등 찍힌다'),
-    LineQuestion(prompt: '우물 안', answer: '개구리'),
-    LineQuestion(prompt: '발 없는 말이', answer: '천 리 간다'),
-    LineQuestion(prompt: '그림의', answer: '떡'),
-    LineQuestion(prompt: '열 번 찍어 안 넘어가는', answer: '나무 없다'),
-    LineQuestion(prompt: '콩 심은 데 콩 나고', answer: '팥 심은 데 팥 난다'),
-  ],
-};
+Map<String, List<LineQuestion>> lineQuestions = {};
+
+bool isLoadingQuestions = true;
+String? questionLoadError;
 
 enum LineGamePhase {
   setup,
@@ -108,7 +42,16 @@ class LineGameScreen extends StatefulWidget {
 }
 
 class _LineGameScreenState extends State<LineGameScreen> {
-  String selectedCategory = '사자성어';
+  final Set<String> selectedCategories = {'사자성어'};
+
+  final List<String> categories = [
+    '사자성어',
+    '일상 단어',
+    '속담',
+  ];
+  int maxQuestionsPerTeam = 10;
+  // 팀별로 사용할 문제 목록
+  List<List<LineQuestion>> teamQuestionSets = [];
   LineGamePhase phase = LineGamePhase.setup;
 
   late List<int> scores;
@@ -123,11 +66,70 @@ class _LineGameScreenState extends State<LineGameScreen> {
 
   Timer? timer;
 
+  Future<void> _loadLineQuestions() async {
+    try {
+      final jsonString = await rootBundle.loadString(
+        'assets/questions/line_game.json',
+      );
+
+      final List<dynamic> decoded = jsonDecode(jsonString);
+
+      final Map<String, List<LineQuestion>> loadedQuestions = {};
+
+      for (final item in decoded) {
+        final category = item['category']?.toString().trim() ?? '';
+        final prompt = item['prompt']?.toString().trim() ?? '';
+        final answer = item['answer']?.toString().trim() ?? '';
+
+        if (category.isEmpty || prompt.isEmpty || answer.isEmpty) {
+          continue;
+        }
+
+        loadedQuestions.putIfAbsent(category, () => []);
+
+        loadedQuestions[category]!.add(
+          LineQuestion(
+            prompt: prompt,
+            answer: answer,
+          ),
+        );
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        lineQuestions = loadedQuestions;
+        isLoadingQuestions = false;
+        questionLoadError = null;
+      });
+
+      debugPrint('[줄줄이 말해요] JSON 로딩 성공');
+      debugPrint('[줄줄이 말해요] 카테고리: ${lineQuestions.keys.toList()}');
+
+      for (final entry in lineQuestions.entries) {
+        debugPrint(
+          '[줄줄이 말해요] ${entry.key}: ${entry.value.length}문제',
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('[줄줄이 말해요] JSON 로딩 실패: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      setState(() {
+        isLoadingQuestions = false;
+        questionLoadError = e.toString();
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     final teams = context.read<SessionState>().teams;
     scores = List<int>.filled(teams.length, 0);
+    _loadLineQuestions();
   }
 
   @override
@@ -137,25 +139,87 @@ class _LineGameScreenState extends State<LineGameScreen> {
   }
 
   LineQuestion get currentQuestion => questions[questionIdx];
+  void _showStartError(String message) {
+    if (!mounted) return;
 
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
   void _startGame() {
+    if (selectedCategories.isEmpty) {
+      _showStartError('카테고리를 하나 이상 선택해주세요.');
+      return;
+    }
+
     final teams = context.read<SessionState>().teams;
 
     if (teams.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('먼저 팀을 등록해 주세요.')),
+      _showStartError('등록된 팀이 없습니다.');
+      return;
+    }
+
+    final pool = selectedCategories
+        .expand((category) => lineQuestions[category] ?? <LineQuestion>[])
+        .toList();
+
+    // 같은 문제가 JSON에 중복 등록된 경우도 제거
+    final uniquePool = <String, LineQuestion>{};
+
+    for (final question in pool) {
+      final key = '${question.prompt}|${question.answer}';
+      uniquePool[key] = question;
+    }
+
+    final availableQuestions = uniquePool.values.toList();
+
+    if (availableQuestions.isEmpty) {
+      _showStartError('선택한 카테고리에 문제가 없습니다.');
+      return;
+    }
+
+    // 팀별 문제 목록을 따로 생성한다.
+    // 한 팀의 목록 안에서는 문제가 중복되지 않는다.
+    // 전체 문제를 한 번 섞고, 한 번만 배정한다.
+    // 이미 배정된 문제는 다른 팀에 배정하지 않는다.
+    final shuffledQuestions = List<LineQuestion>.from(availableQuestions)
+      ..shuffle();
+
+    final newTeamQuestionSets = <List<LineQuestion>>[];
+    final requiredTotal = teams.length * maxQuestionsPerTeam;
+
+    // 팀 수 × 팀당 문제 수만큼 고유한 문제가 없으면 시작하지 않는다.
+    if (shuffledQuestions.length < requiredTotal) {
+      _showStartError(
+        '중복 없이 진행하려면 문제가 최소 $requiredTotal개 필요합니다. '
+        '현재 선택한 카테고리의 고유 문제는 ${shuffledQuestions.length}개입니다. '
+        '카테고리를 더 선택하거나 팀당 문제 수를 줄여주세요.',
       );
       return;
     }
 
-    questions = List<LineQuestion>.of(
-      lineQuestions[selectedCategory]!,
-    )..shuffle();
+    var startIndex = 0;
+
+    for (var i = 0; i < teams.length; i++) {
+      final endIndex = startIndex + maxQuestionsPerTeam;
+
+      newTeamQuestionSets.add(
+        shuffledQuestions.sublist(startIndex, endIndex),
+      );
+
+      startIndex = endIndex;
+    }
 
     setState(() {
-      scores = List<int>.filled(teams.length, 0);
-      teamIdx = 0;
+      teamQuestionSets = newTeamQuestionSets;
+
+      questions
+        ..clear()
+        ..addAll(teamQuestionSets.first);
+
       questionIdx = 0;
+      teamIdx = 0;
+      scores = List<int>.filled(teams.length, 0);
       remaining = lineGameSeconds;
       answerRevealed = false;
       saved = false;
@@ -198,6 +262,13 @@ class _LineGameScreenState extends State<LineGameScreen> {
 
       if (teamIdx + 1 < teams.length) {
         teamIdx++;
+
+        // 다음 팀 전용 문제 목록으로 교체
+        questions
+          ..clear()
+          ..addAll(teamQuestionSets[teamIdx]);
+
+        questionIdx = 0;
         phase = LineGamePhase.ready;
       } else {
         phase = LineGamePhase.finished;
@@ -208,19 +279,20 @@ class _LineGameScreenState extends State<LineGameScreen> {
   void _nextQuestion({required bool correct}) {
     if (phase != LineGamePhase.playing) return;
 
-    setState(() {
-      if (correct) {
+    if (correct) {
+      setState(() {
         scores[teamIdx]++;
-      }
+      });
+    }
 
-      // 현재 문제 묶음을 다 풀면 다시 섞어 출제한다.
-      if (questionIdx + 1 < questions.length) {
-        questionIdx++;
-      } else {
-        questions.shuffle();
-        questionIdx = 0;
-      }
+    // 마지막 문제를 처리했으면 다음 팀으로 자동 이동
+    if (questionIdx + 1 >= questions.length) {
+      _finishTeam();
+      return;
+    }
 
+    setState(() {
+      questionIdx++;
       answerRevealed = false;
     });
   }
@@ -231,7 +303,7 @@ class _LineGameScreenState extends State<LineGameScreen> {
     if (!saved && phase != LineGamePhase.setup) {
       context.read<SessionState>().addResult(
             GameResult(
-              gameType: '줄줄이 말해요 - $selectedCategory',
+              gameType: '줄줄이 말해요 - ${selectedCategories.join(', ')}',
               scores: List<int>.of(scores),
             ),
           );
@@ -276,27 +348,53 @@ class _LineGameScreenState extends State<LineGameScreen> {
           '카테고리 선택',
           style: Theme.of(context).textTheme.headlineSmall,
         ),
+
+        const SizedBox(height: 24),
+        Text(
+          '팀당 최대 문제 수',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: [5, 10, 15, 20].map((count) {
+            return ChoiceChip(
+              label: Text('$count문제'),
+              selected: maxQuestionsPerTeam == count,
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() {
+                    maxQuestionsPerTeam = count;
+                  });
+                }
+              },
+            );
+          }).toList(),
+        ),
+
         const SizedBox(height: 8),
         const Text('선택한 카테고리의 문제로 팀별 30초 동안 진행합니다.'),
         const SizedBox(height: 20),
-        DropdownButtonFormField<String>(
-          value: selectedCategory,
-          decoration: const InputDecoration(
-            labelText: '문제 카테고리',
-            border: OutlineInputBorder(),
-          ),
-          items: [
-            for (final category in lineQuestions.keys)
-              DropdownMenuItem(
-                value: category,
-                child: Text('$category (${lineQuestions[category]!.length}문제)'),
-              ),
-          ],
-          onChanged: (value) {
-            if (value != null) {
-              setState(() => selectedCategory = value);
-            }
-          },
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: categories.map((category) {
+            final isSelected = selectedCategories.contains(category);
+
+            return FilterChip(
+              label: Text(category),
+              selected: isSelected,
+              onSelected: (selected) {
+                setState(() {
+                  if (selected) {
+                    selectedCategories.add(category);
+                  } else {
+                    selectedCategories.remove(category);
+                  }
+                });
+              },
+            );
+          }).toList(),
         ),
         const SizedBox(height: 24),
         Text(
@@ -338,8 +436,12 @@ class _LineGameScreenState extends State<LineGameScreen> {
         SizedBox(
           width: double.infinity,
           child: FilledButton(
-            onPressed: _startGame,
-            child: const Text('게임 시작'),
+            onPressed: isLoadingQuestions ? null : _startGame,
+            child: Text(
+              isLoadingQuestions
+                  ? '문제 불러오는 중...'
+                  : '게임 시작',
+            ),
           ),
         ),
       ],
@@ -356,7 +458,7 @@ class _LineGameScreenState extends State<LineGameScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              selectedCategory,
+              selectedCategories.join(', '),
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
@@ -384,131 +486,178 @@ class _LineGameScreenState extends State<LineGameScreen> {
     );
   }
 
+
   Widget _buildPlaying(List<Team> teams) {
     final team = teams[teamIdx];
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isLandscape =
+            constraints.maxWidth > constraints.maxHeight;
+
+        final compact = isLandscape || constraints.maxHeight < 500;
+        final padding = compact ? 8.0 : 16.0;
+        final gap = compact ? 6.0 : 12.0;
+
+        return Padding(
+          padding: EdgeInsets.all(padding),
+          child: Column(
             children: [
-              Expanded(
-                child: Text(
-                  '${team.name} 차례',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-              Text(
-                '$remaining초',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: remaining <= 10
-                          ? Theme.of(context).colorScheme.error
-                          : null,
-                      fontWeight: FontWeight.bold,
+              // 팀 이름과 남은 시간
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${team.name} 차례 · ${scores[teamIdx]}점',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          LinearProgressIndicator(
-            value: remaining / lineGameSeconds,
-            minHeight: 8,
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '현재 점수: ${scores[teamIdx]}점',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: Card(
-              child: SizedBox(
-                width: double.infinity,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        selectedCategory,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 20),
-                      const Text('앞부분'),
-                      const SizedBox(height: 8),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          currentQuestion.prompt,
-                          style: Theme.of(context)
-                              .textTheme
-                              .displayMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
+                  ),
+                  Text(
+                    '$remaining초',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: remaining <= 10
+                              ? Theme.of(context).colorScheme.error
+                              : null,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      if (answerRevealed) ...[
-                        const Text('정답'),
-                        const SizedBox(height: 8),
-                        Text(
-                          currentQuestion.answer,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.bold,
+                  ),
+                ],
+              ),
+
+              SizedBox(height: gap),
+
+              LinearProgressIndicator(
+                value: remaining / lineGameSeconds,
+                minHeight: 5,
+              ),
+
+              SizedBox(height: gap),
+
+              // 남은 화면 공간을 문제 카드가 사용
+              Expanded(
+                child: Card(
+                  margin: EdgeInsets.zero,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Padding(
+                      padding: EdgeInsets.all(compact ? 8 : 16),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            selectedCategories.join(', '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+
+                          SizedBox(height: compact ? 4 : 12),
+
+                          const Text('앞부분'),
+
+                          SizedBox(height: compact ? 4 : 8),
+
+                          Expanded(
+                            child: Center(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  currentQuestion.prompt,
+                                  style: (compact
+                                          ? Theme.of(context)
+                                              .textTheme
+                                              .headlineMedium
+                                          : Theme.of(context)
+                                              .textTheme
+                                              .displayMedium)
+                                      ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ] else
-                        OutlinedButton.icon(
-                          onPressed: () =>
-                              setState(() => answerRevealed = true),
-                          icon: const Icon(Icons.visibility),
-                          label: const Text('정답 확인'),
-                        ),
-                    ],
+                            ),
+                          ),
+
+                          if (answerRevealed) ...[
+                            SizedBox(height: compact ? 2 : 8),
+                            const Text('정답'),
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  currentQuestion.answer,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ] else
+                            OutlinedButton(
+                              onPressed: () {
+                                setState(() => answerRevealed = true);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: compact ? 12 : 20,
+                                  vertical: compact ? 4 : 8,
+                                ),
+                              ),
+                              child: const Text('정답 확인'),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => _nextQuestion(correct: true),
-                  icon: const Icon(Icons.check),
-                  label: const Text('정답 +1점'),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 56),
+
+              SizedBox(height: gap),
+
+              // 하단 버튼은 화면 너비에 맞춰 배치
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: compact ? 42 : 52,
+                      child: FilledButton.icon(
+                        onPressed: () => _nextQuestion(correct: true),
+                        icon: const Icon(Icons.check),
+                        label: const Text('정답 +1점'),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _nextQuestion(correct: false),
-                  icon: const Icon(Icons.skip_next),
-                  label: const Text('넘기기'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 56),
+                  SizedBox(width: gap),
+                  Expanded(
+                    child: SizedBox(
+                      height: compact ? 42 : 52,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _nextQuestion(correct: false),
+                        icon: const Icon(Icons.skip_next),
+                        label: const Text('넘기기'),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
+
 
   Widget _buildFinished(List<Team> teams) {
     final ranked = List<int>.generate(teams.length, (i) => i)

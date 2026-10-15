@@ -1,0 +1,62 @@
+[
+  {
+    "name": "유재석",
+    "image": "assets/images/people/yoo_jae_suk.jpg",
+    "difficulty": "쉬움",
+    "category": "예능인"
+  },
+  {
+    "name": "강호동",
+    "image": "assets/images/people/kang_ho_dong.jpg",
+    "difficulty": "쉬움",
+    "category": "예능인"
+  },
+  {
+    "name": "아이유",
+    "image": "assets/images/people/iu.jpg",
+    "difficulty": "쉬움",
+    "category": "가수"
+  },
+  {
+    "name": "손흥민",
+    "image": "assets/images/people/son_heung_min.jpg",
+    "difficulty": "쉬움",
+    "category": "스포츠"
+  },
+  {
+    "name": "임영웅",
+    "image": "assets/images/people/lim_young_woong.jpg",
+    "difficulty": "쉬움",
+    "category": "가수"
+  },
+  {
+    "name": "김연아",
+    "image": "assets/images/people/kim_yuna.jpg",
+    "difficulty": "쉬움",
+    "category": "스포츠"
+  },
+  {
+    "name": "송강호",
+    "image": "assets/images/people/song_kang_ho.jpg",
+    "difficulty": "보통",
+    "category": "배우"
+  },
+  {
+    "name": "전지현",
+    "image": "assets/images/people/jun_ji_hyun.jpg",
+    "difficulty": "보통",
+    "category": "배우"
+  },
+  {
+    "name": "마이클 잭슨",
+    "image": "assets/images/people/michael_jackson.jpg",
+    "difficulty": "보통",
+    "category": "해외 유명인"
+  },
+  {
+    "name": "톰 크루즈",
+    "image": "assets/images/people/tom_cruise.jpg",
+    "difficulty": "보통",
+    "category": "해외 유명인"
+  }
+]

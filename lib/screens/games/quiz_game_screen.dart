@@ -6,7 +6,7 @@ import '../../data/session_state.dart';
 import '../../models/game_result.dart';
 import '../../models/quiz_question.dart';
 
-const quizSeconds = 20;
+const quizSeconds = 5;
 
 enum Phase { setup, ready, playing, finished }
 

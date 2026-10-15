@@ -4,12 +4,9 @@ import 'package:provider/provider.dart';
 import 'data/session_state.dart';
 import 'screens/home_screen.dart';
 
-void main() async {
+void main()  {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => SessionState(),
