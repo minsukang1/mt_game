@@ -12,7 +12,7 @@ import 'games/character_quiz_screen.dart';
 const gameNames = [
   '상식퀴즈',
   '줄줄이 말해요',
-  '고요 속의 외침',
+  // '고요 속의 외침',
   '인물 퀴즈',
 ];
 

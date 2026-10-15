@@ -6,7 +6,10 @@ import '../../data/session_state.dart';
 import '../../models/game_result.dart';
 import '../../models/quiz_question.dart';
 
-const quizSeconds = 5;
+const int quizSeconds = 5;
+
+// 선택 가능한 문제당 제한 시간
+const List<int> quizTimeOptions = [5, 10, 15, 20, 30, 60];
 
 enum Phase { setup, ready, playing, finished }
 
@@ -21,7 +24,10 @@ class _QuizGameScreenState extends State<QuizGameScreen> {
   List<QuizQuestion> all = [];
   List<String> categories = [];
   final Set<String> selected = {};
+  // 팀당 문제 수
   int perTeam = 5;
+  // 게임 시작 전에 설정하는 문제당 제한 시간
+  int secondsPerQuestion = quizSeconds;
 
   Phase phase = Phase.setup;
   bool loaded = false;
@@ -84,18 +90,36 @@ class _QuizGameScreenState extends State<QuizGameScreen> {
     _startTimer();
   }
 
+  
   void _startTimer() {
     timer?.cancel();
-    setState(() => remaining = quizSeconds);
+
+    setState(() {
+      remaining = secondsPerQuestion;
+    });
+
     timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (remaining <= 1) {
+      if (!mounted) {
         t.cancel();
-        setState(() => remaining = 0);
         return;
       }
-      setState(() => remaining--);
+
+      if (remaining <= 1) {
+        t.cancel();
+
+        setState(() {
+          remaining = 0;
+        });
+
+        return;
+      }
+
+      setState(() {
+        remaining--;
+      });
     });
   }
+
 
   void _answer({required bool correct}) {
     if (correct) scores[teamIdx]++;
@@ -229,8 +253,32 @@ class _QuizGameScreenState extends State<QuizGameScreen> {
             ),
           ],
         ),
+        
         const SizedBox(height: 16),
-        Text('팀당 문제 수', style: theme.textTheme.titleMedium),
+
+        // 문제당 제한 시간 설정
+        Text('문제당 제한 시간', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: quizTimeOptions.map((seconds) {
+            return ChoiceChip(
+              label: Text('$seconds초'),
+              selected: secondsPerQuestion == seconds,
+              onSelected: (selectedTime) {
+                if (selectedTime) {
+                  setState(() {
+                    secondsPerQuestion = seconds;
+                  });
+                }
+              },
+            );
+          }).toList(),
+        ),
+
+        Text('문제 수', style: theme.textTheme.titleMedium),
         Row(
           children: [
             IconButton(
@@ -266,118 +314,125 @@ class _QuizGameScreenState extends State<QuizGameScreen> {
           const SizedBox(height: 12),
           if (t.members.isNotEmpty) Text(t.members.join(', ')),
           const SizedBox(height: 12),
-          Text('${assigned[teamIdx].length}문제 · 문제당 $quizSeconds초'),
+          Text('${assigned[teamIdx].length}문제 · 문제당 $secondsPerQuestion초',),
         ],
       ),
     );
   }
-
+  
+  
 Widget _questionView(List teams) {
   final q = assigned[teamIdx][qIdx];
   final theme = Theme.of(context);
 
   return LayoutBuilder(
     builder: (context, constraints) {
-      // 현재 문제 영역의 실제 너비와 높이
       final width = constraints.maxWidth;
       final height = constraints.maxHeight;
 
-      // 화면이 작으면 글자도 작아지고,
-      // 화면이 크면 글자도 커지도록 설정
-      final questionFontSize =
-          (height * 0.10).clamp(18.0, 40.0);
-      final timerFontSize =
-          (height * 0.16).clamp(30.0, 60.0);
-      final answerFontSize =
-          (height * 0.075).clamp(18.0, 32.0);
+      // 가로 화면이나 높이가 낮은 화면에서는 간격을 줄임
+      final compact = height < 500;
+      final padding = compact ? 8.0 : 12.0;
+      final gap = compact ? 4.0 : 8.0;
 
-      return SizedBox(
-        width: double.infinity,
-        height: double.infinity,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 4,
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: height > 0 ? height - 8 : 0,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 현재 팀과 문제 번호
+      // 화면 크기에 맞춰 타이머 글자 크기 조절
+      final timerFontSize = (height * 0.12).clamp(24.0, 60.0);
+
+      return SizedBox.expand(
+        child: Padding(
+          padding: EdgeInsets.all(padding),
+          child: Column(
+            children: [
+              // 현재 팀, 문제 번호, 카테고리
+              Text(
+                '${teams[teamIdx].name} · '
+                '문제 ${qIdx + 1}/${assigned[teamIdx].length} · '
+                '${q.category}',
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontSize: width < 400 ? 13 : 17,
+                ),
+              ),
+
+              SizedBox(height: gap),
+
+              // 남은 시간
+              Text(
+                '$remaining',
+                style: theme.textTheme.displayLarge?.copyWith(
+                  fontSize: timerFontSize,
+                  color: remaining <= 5 ? Colors.red : null,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              if (remaining == 0)
                 Text(
-                  '${teams[teamIdx].name} · '
-                  '문제 ${qIdx + 1}/${assigned[teamIdx].length} · '
-                  '${q.category}',
-                  textAlign: TextAlign.center,
+                  '시간 종료!',
                   style: theme.textTheme.titleMedium?.copyWith(
-                    fontSize: width < 400 ? 14 : 18,
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
 
-                const SizedBox(height: 4),
+              SizedBox(height: gap),
 
-                // 남은 시간
-                Text(
-                  '$remaining',
-                  style: theme.textTheme.displayLarge?.copyWith(
-                    fontSize: timerFontSize,
-                    color: remaining <= 5
-                        ? Colors.red
-                        : null,
-                  ),
-                ),
-
-                if (remaining == 0)
-                  Text(
-                    '시간 종료!',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: Colors.red,
-                    ),
-                  ),
-
-                const SizedBox(height: 8),
-
-                // 문제 본문
-                SizedBox(
-                  width: double.infinity,
-                  child: Text(
-                    q.question,
-                    textAlign: TextAlign.center,
-                    softWrap: true,
-                    style: theme.textTheme.headlineLarge?.copyWith(
-                      fontSize: questionFontSize,
-                      fontWeight: FontWeight.bold,
-                      height: 1.2,
+              // 문제 영역이 남은 공간을 전부 사용
+              Expanded(
+                child: Center(
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FittedBox(
+                      // 글자가 영역보다 크면 축소하고,
+                      // 공간이 넓으면 기준 글자 크기까지 확대
+                      fit: BoxFit.contain,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: width - padding * 2,
+                        ),
+                        child: Text(
+                          q.question,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.headlineLarge?.copyWith(
+                            fontSize: 100,
+                            fontWeight: FontWeight.bold,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
+              ),
 
-                // 정답 보기 버튼을 누른 뒤에만 정답 표시
-                if (revealed) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    q.answer,
-                    textAlign: TextAlign.center,
-                    softWrap: true,
-                    style: theme.textTheme.displaySmall?.copyWith(
-                      fontSize: answerFontSize,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
+              // 정답 확인 버튼을 누른 뒤에만 정답 표시
+              if (revealed) ...[
+                SizedBox(height: gap),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      q.answer,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.displaySmall?.copyWith(
+                        fontSize: 36,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
                     ),
                   ),
-                ],
+                ),
               ],
-            ),
+            ],
           ),
         ),
       );
     },
   );
 }
+
 
   Widget _bottom() {
     switch (phase) {

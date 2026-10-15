@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+// import 'package:auto_size_text/auto_size_text.dart';
 
 import '../../data/session_state.dart';
 import '../../models/game_result.dart';
@@ -10,7 +11,11 @@ import '../../models/team.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
 
+// 팀별 제한 시간 기본값
 const int lineGameSeconds = 30;
+
+// 설정 화면에서 선택할 수 있는 제한 시간
+const List<int> lineGameTimeOptions = [5, 10, 15, 20, 30, 60, 120, 300];
 
 class LineQuestion {
   final String prompt;
@@ -50,6 +55,8 @@ class _LineGameScreenState extends State<LineGameScreen> {
     '속담',
   ];
   int maxQuestionsPerTeam = 10;
+  // 게임 시작 전에 설정하는 팀별 제한 시간
+  int teamSeconds = lineGameSeconds;
   // 팀별로 사용할 문제 목록
   List<List<LineQuestion>> teamQuestionSets = [];
   LineGamePhase phase = LineGamePhase.setup;
@@ -220,7 +227,7 @@ class _LineGameScreenState extends State<LineGameScreen> {
       questionIdx = 0;
       teamIdx = 0;
       scores = List<int>.filled(teams.length, 0);
-      remaining = lineGameSeconds;
+      remaining = teamSeconds;
       answerRevealed = false;
       saved = false;
       phase = LineGamePhase.ready;
@@ -230,7 +237,7 @@ class _LineGameScreenState extends State<LineGameScreen> {
   void _startTeam() {
     setState(() {
       phase = LineGamePhase.playing;
-      remaining = lineGameSeconds;
+      remaining = teamSeconds;
       answerRevealed = false;
     });
 
@@ -372,8 +379,36 @@ class _LineGameScreenState extends State<LineGameScreen> {
           }).toList(),
         ),
 
+        const SizedBox(height: 20),
+
+        // 제한 시간 설정
+        Text(
+          '팀별 제한 시간',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
-        const Text('선택한 카테고리의 문제로 팀별 30초 동안 진행합니다.'),
+
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: lineGameTimeOptions.map((seconds) {
+            return ChoiceChip(
+              label: Text('$seconds초'),
+              selected: teamSeconds == seconds,
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() {
+                    teamSeconds = seconds;
+                  });
+                }
+              },
+            );
+          }).toList(),
+        ),
+
+        const SizedBox(height: 8),
+        Text('선택한 카테고리의 문제로 팀별 $teamSeconds초 동안 진행합니다.'),
+
         const SizedBox(height: 20),
         Wrap(
           spacing: 8,
@@ -470,7 +505,7 @@ class _LineGameScreenState extends State<LineGameScreen> {
             const SizedBox(height: 8),
             Text('현재 점수: ${scores[teamIdx]}점'),
             const SizedBox(height: 8),
-            const Text('준비되면 시작 버튼을 누르세요. 제한 시간은 30초입니다.'),
+            Text('준비되면 시작 버튼을 누르세요. 제한 시간은 $teamSeconds초입니다.'),
             const SizedBox(height: 24),
             SizedBox(
               width: 220,
@@ -487,6 +522,7 @@ class _LineGameScreenState extends State<LineGameScreen> {
   }
 
 
+  
   Widget _buildPlaying(List<Team> teams) {
     final team = teams[teamIdx];
 
@@ -517,11 +553,11 @@ class _LineGameScreenState extends State<LineGameScreen> {
                   Text(
                     '$remaining초',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: remaining <= 10
-                              ? Theme.of(context).colorScheme.error
-                              : null,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      color: remaining <= 10
+                          ? Theme.of(context).colorScheme.error
+                          : null,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -529,13 +565,13 @@ class _LineGameScreenState extends State<LineGameScreen> {
               SizedBox(height: gap),
 
               LinearProgressIndicator(
-                value: remaining / lineGameSeconds,
+                value: teamSeconds > 0 ? remaining / teamSeconds : 0,
                 minHeight: 5,
               ),
 
               SizedBox(height: gap),
 
-              // 남은 화면 공간을 문제 카드가 사용
+              // 문제 카드가 남은 화면 공간을 최대한 사용
               Expanded(
                 child: Card(
                   margin: EdgeInsets.zero,
@@ -544,8 +580,8 @@ class _LineGameScreenState extends State<LineGameScreen> {
                     child: Padding(
                       padding: EdgeInsets.all(compact ? 8 : 16),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
+                          // 카테고리
                           Text(
                             selectedCategories.join(', '),
                             maxLines: 1,
@@ -553,52 +589,61 @@ class _LineGameScreenState extends State<LineGameScreen> {
                             style: Theme.of(context).textTheme.labelMedium,
                           ),
 
-                          SizedBox(height: compact ? 4 : 12),
+                          SizedBox(height: compact ? 4 : 8),
 
                           const Text('앞부분'),
 
-                          SizedBox(height: compact ? 4 : 8),
+                          SizedBox(height: compact ? 2 : 6),
 
+                          // 제시어: 남은 공간에 맞춰 최대한 크게 표시
                           Expanded(
-                            child: Center(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  currentQuestion.prompt,
-                                  style: (compact
-                                          ? Theme.of(context)
-                                              .textTheme
-                                              .headlineMedium
-                                          : Theme.of(context)
-                                              .textTheme
-                                              .displayMedium)
-                                      ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
+                            flex: answerRevealed ? 6 : 8,
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: LayoutBuilder(
+                                builder: (context, textConstraints) {
+                                  return FittedBox(
+                                    fit: BoxFit.contain,
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth: textConstraints.maxWidth,
+                                        maxHeight: textConstraints.maxHeight,
+                                      ),
+                                      child: Text(
+                                        currentQuestion.prompt,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          fontSize: 120,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                           ),
 
+                          // 정답 공개 시에도 남은 공간에 맞춰 크게 표시
                           if (answerRevealed) ...[
-                            SizedBox(height: compact ? 2 : 8),
+                            SizedBox(height: compact ? 2 : 6),
                             const Text('정답'),
-                            Flexible(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  currentQuestion.answer,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                  textAlign: TextAlign.center,
+                            Expanded(
+                              flex: 3,
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: FittedBox(
+                                  fit: BoxFit.contain,
+                                  child: Text(
+                                    currentQuestion.answer,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 60,
+                                      color: Theme.of(context)
+                                          .colorScheme.primary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -625,7 +670,7 @@ class _LineGameScreenState extends State<LineGameScreen> {
 
               SizedBox(height: gap),
 
-              // 하단 버튼은 화면 너비에 맞춰 배치
+              // 하단 버튼
               Row(
                 children: [
                   Expanded(
@@ -657,6 +702,7 @@ class _LineGameScreenState extends State<LineGameScreen> {
       },
     );
   }
+
 
 
   Widget _buildFinished(List<Team> teams) {
