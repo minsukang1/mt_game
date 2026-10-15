@@ -5,12 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ed5ac95a-1b5a-4e3c-a6ec-f510fbd94d5c" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/assets/questions/line_game.json" beforeDir="false" afterPath="$PROJECT_DIR$/assets/questions/line_game.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/main.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/main.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/screens/games/line_game_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/screens/games/line_game_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/screens/games/quiz_game_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/screens/games/quiz_game_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/screens/total_score_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/screens/total_score_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/questions/character_quiz.json" beforeDir="false" afterPath="$PROJECT_DIR$/assets/questions/character_quiz.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

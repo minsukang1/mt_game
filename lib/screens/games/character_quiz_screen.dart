@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../data/session_state.dart';
-import '../models/game_result.dart';
+import '../../data/session_state.dart';
+import '../../models/game_result.dart';
 
 class CharacterQuizScreen extends StatefulWidget {
   const CharacterQuizScreen({super.key});
